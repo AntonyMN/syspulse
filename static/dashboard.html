@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SysPulse | Ubuntu Laptop Health & Process Controller</title>
+  <meta name="description" content="Ubuntu Laptop Health Monitor, RAM Analytics Graph, and Process Controller with Active/Background sorting and Process Crossing.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="dark-theme">
+
+  <!-- Main App Shell -->
+  <div class="app-layout">
+    
+    <!-- Top Navigation Bar -->
+    <header class="top-nav">
+      <div class="nav-brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">SysPulse</span>
+          <span class="brand-subtitle">Ubuntu Laptop Doctor & Process Controller</span>
+        </div>
+        <div class="live-pill" id="livePill">
+          <span class="live-dot"></span>
+          <span class="live-status">LIVE SYSTEM</span>
+        </div>
+      </div>
+
+      <!-- Quick System Info Chips -->
+      <div class="nav-system-info">
+        <div class="info-chip" title="Hostname">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <span id="sysHostname">ubuntu</span>
+        </div>
+        <div class="info-chip" title="Operating System">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+          <span id="sysOs">Ubuntu Linux</span>
+        </div>
+        <div class="info-chip" title="Uptime">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span id="sysUptime">0h 0m</span>
+        </div>
+      </div>
+
+      <!-- Controls & Refresh -->
+      <div class="nav-controls">
+        <div class="refresh-interval-wrapper">
+          <label for="refreshSelect">Interval:</label>
+          <select id="refreshSelect" class="styled-select">
+            <option value="1000">1s (Ultra Fast)</option>
+            <option value="2000" selected>2s (Default)</option>
+            <option value="5000">5s (Relaxed)</option>
+            <option value="0">Paused</option>
+          </select>
+        </div>
+        <button id="btnManualRefresh" class="btn btn-secondary btn-icon" title="Refresh Now">
+          <svg id="refreshIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          <span>Refresh</span>
+        </button>
+        <a href="index.html" class="btn btn-secondary btn-icon" style="text-decoration: none;" title="Documentation & Installation Guide">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span>Docs &amp; Guide</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Demo Showcase Mode Banner (GitHub Pages / Static Preview) -->
+    <div id="demoBanner" class="demo-banner" style="display: none;">
+      <div class="demo-left">
+        <span class="demo-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Live Web Demo
+        </span>
+        <span class="demo-text">SysPulse is running in preview mode with simulated Ubuntu Linux telemetry. Run locally on Ubuntu with <code>./start.sh</code> for real hardware stats and process controls.</span>
+      </div>
+      <a href="https://github.com/AntonyMN/syspulse" target="_blank" class="demo-github-link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub Repo
+      </a>
+    </div>
+
+    <!-- Global Progress Bar for Auto-refresh countdown -->
+    <div class="refresh-progress-bar"><div class="progress-fill" id="countdownBar"></div></div>
+
+    <!-- Navigation Tabs -->
+    <nav class="sub-nav">
+      <div class="tabs-group">
+        <button class="nav-tab active" data-tab="tab-overview">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>1. Laptop Condition & Issues</span>
+          <span class="tab-badge warning-badge" id="issuesCountBadge">0</span>
+        </button>
+        <button class="nav-tab" data-tab="tab-ram">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          <span>2. RAM Analytics & Graph</span>
+          <span class="tab-badge info-badge" id="ramQuickBadge">--%</span>
+        </button>
+        <button class="nav-tab" data-tab="tab-processes">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          <span>3. Process Manager</span>
+          <span class="tab-badge active-badge" id="activeProcsCountBadge">0 Active</span>
+        </button>
+        <button class="nav-tab" data-tab="tab-apps">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+          </svg>
+          <span>4. Running Programs & Apps</span>
+          <span class="tab-badge info-badge" id="appsCountBadge">0 Apps</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- ============================================================== -->
+      <!-- TAB 1: LAPTOP CONDITION & ISSUES                                -->
+      <!-- ============================================================== -->
+      <section id="tab-overview" class="tab-content active">
+        
+        <!-- Condition Summary Hero Banner -->
+        <div class="health-hero-card" id="healthHeroCard">
+          <div class="health-score-container">
+            <div class="health-gauge">
+              <svg class="score-circle-svg" viewBox="0 0 120 120">
+                <circle class="score-circle-bg" cx="60" cy="60" r="50"></circle>
+                <circle class="score-circle-bar" id="scoreCircleBar" cx="60" cy="60" r="50"></circle>
+              </svg>
+              <div class="score-text">
+                <span class="score-num" id="healthScoreNum">--</span>
+                <span class="score-label">HEALTH SCORE</span>
+              </div>
+            </div>
+            <div class="health-grade-badge" id="healthGradeBadge">--</div>
+          </div>
+
+          <div class="health-summary-details">
+            <div class="health-title-row">
+              <h2 id="healthStatusTitle">Analyzing Laptop Condition...</h2>
+              <span class="health-pill" id="healthStatusPill">Scanning Hardware</span>
+            </div>
+            <p class="health-description" id="healthDescription">
+              Evaluating CPU temperature sensors, battery wear level, Linux boot logs, kernel errors, and storage capacity.
+            </p>
+            <div class="health-deductions-list" id="healthDeductionsList"></div>
+          </div>
+
+          <div class="health-quick-stats">
+            <div class="quick-stat-box">
+              <span class="stat-caption">Max Temp</span>
+              <span class="stat-val" id="quickStatTemp">--°C</span>
+              <span class="stat-sub" id="quickStatTempSub">Package Sensor</span>
+            </div>
+            <div class="quick-stat-box">
+              <span class="stat-caption">Battery Wear</span>
+              <span class="stat-val" id="quickStatBatteryWear">--%</span>
+              <span class="stat-sub" id="quickStatBatteryCycles">-- cycles</span>
+            </div>
+            <div class="quick-stat-box">
+              <span class="stat-caption">Storage (/)</span>
+              <span class="stat-val" id="quickStatStorage">--%</span>
+              <span class="stat-sub" id="quickStatStorageFree">-- free</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Grid Hardware Cards -->
+        <div class="cards-grid-4">
+          
+          <!-- Card: Thermals -->
+          <div class="glass-card hardware-card">
+            <div class="card-header">
+              <div class="card-icon icon-thermals">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+              </div>
+              <div class="card-title-wrap">
+                <h3>Thermal & Temperature</h3>
+                <span class="card-subtitle">CPU & ACPI Sensors</span>
+              </div>
+              <span class="status-indicator" id="thermalStatusBadge">Normal</span>
+            </div>
+            <div class="card-body">
+              <div class="hero-metric">
+                <span class="metric-number" id="cpuPackageTemp">--</span>
+                <span class="metric-unit">°C</span>
+                <span class="metric-tag" id="cpuTempTag">Normal</span>
+              </div>
+              <div class="sensor-bars-list" id="cpuSensorsList">
+                <!-- Dynamically populated core temps -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Card: Battery Health -->
+          <div class="glass-card hardware-card">
+            <div class="card-header">
+              <div class="card-icon icon-battery">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2" ry="2"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
+              </div>
+              <div class="card-title-wrap">
+                <h3>Battery Health & Wear</h3>
+                <span class="card-subtitle">Wear level & charge capacity</span>
+              </div>
+              <span class="status-indicator" id="batteryStateBadge">Scanning</span>
+            </div>
+            <div class="card-body">
+              <div class="hero-metric">
+                <span class="metric-number" id="batteryLevelNum">--</span>
+                <span class="metric-unit">%</span>
+                <span class="metric-tag" id="batteryPluggedTag">Plugged</span>
+              </div>
+              <div class="metric-row">
+                <span>Battery Health:</span>
+                <strong id="batteryHealthPct">--%</strong>
+              </div>
+              <div class="metric-row">
+                <span>Wear Level:</span>
+                <strong id="batteryWearPct">--%</strong>
+              </div>
+              <div class="metric-row">
+                <span>Cycle Count:</span>
+                <strong id="batteryCycleCount">--</strong>
+              </div>
+              <div class="metric-row">
+                <span>Assessment:</span>
+                <span id="batteryAssessmentText" class="badge-mini">Calculating...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card: Storage Condition -->
+          <div class="glass-card hardware-card">
+            <div class="card-header">
+              <div class="card-icon icon-storage">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              </div>
+              <div class="card-title-wrap">
+                <h3>Disk & Storage</h3>
+                <span class="card-subtitle">Root partition capacity</span>
+              </div>
+              <span class="status-indicator" id="diskStatusBadge">Checking</span>
+            </div>
+            <div class="card-body">
+              <div class="hero-metric">
+                <span class="metric-number" id="diskUsedPercent">--</span>
+                <span class="metric-unit">%</span>
+                <span class="metric-tag" id="diskSpaceTag">Used</span>
+              </div>
+              <div class="mini-progress-bar">
+                <div class="mini-fill" id="diskUsageBar" style="width: 0%;"></div>
+              </div>
+              <div class="metric-row">
+                <span>Used Space:</span>
+                <strong id="diskUsedStr">--</strong>
+              </div>
+              <div class="metric-row">
+                <span>Free Space Remaining:</span>
+                <strong id="diskFreeStr" class="highlight-warning">--</strong>
+              </div>
+              <div class="metric-row">
+                <span>Total Capacity:</span>
+                <span id="diskTotalStr">--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card: CPU Load & Architecture -->
+          <div class="glass-card hardware-card">
+            <div class="card-header">
+              <div class="card-icon icon-cpu">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+              </div>
+              <div class="card-title-wrap">
+                <h3>CPU & Architecture</h3>
+                <span class="card-subtitle">Cores and Load Averages</span>
+              </div>
+              <span class="status-indicator optimal-status" id="cpuLoadStatusBadge">Active</span>
+            </div>
+            <div class="card-body">
+              <div class="hero-metric">
+                <span class="metric-number" id="cpuCountNum">--</span>
+                <span class="metric-unit">Cores</span>
+                <span class="metric-tag">x86_64</span>
+              </div>
+              <div class="metric-row">
+                <span>Load 1 min:</span>
+                <strong id="loadAvg1">--</strong>
+              </div>
+              <div class="metric-row">
+                <span>Load 5 min:</span>
+                <strong id="loadAvg5">--</strong>
+              </div>
+              <div class="metric-row">
+                <span>Load 15 min:</span>
+                <strong id="loadAvg15">--</strong>
+              </div>
+              <div class="metric-row">
+                <span>Active User:</span>
+                <span id="activeUserSpan">--</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Detected Issues and Errors Section -->
+        <div class="glass-card issues-section">
+          <div class="section-header-row">
+            <div>
+              <h3 class="section-heading">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Detected Errors, Warnings & Diagnostics
+              </h3>
+              <p class="section-subtext">Real-time inspection of storage alerts, systemd units, ACPI errors, and Linux kernel logs.</p>
+            </div>
+            <div class="issue-filter-chips">
+              <button class="filter-chip active" data-issue-filter="all">All (<span id="totalIssuesCount">0</span>)</button>
+              <button class="filter-chip" data-issue-filter="critical">Critical (<span id="critIssuesCount">0</span>)</button>
+              <button class="filter-chip" data-issue-filter="warning">Warnings (<span id="warnIssuesCount">0</span>)</button>
+              <button class="filter-chip" data-issue-filter="info">Info / Notices (<span id="infoIssuesCount">0</span>)</button>
+            </div>
+          </div>
+
+          <div class="issues-list" id="issuesListContainer">
+            <div class="empty-state">No issues detected. System is running cleanly.</div>
+          </div>
+        </div>
+
+      </section>
+
+
+      <!-- ============================================================== -->
+      <!-- TAB 2: RAM & MEMORY ANALYTICS                                   -->
+      <!-- ============================================================== -->
+      <section id="tab-ram" class="tab-content">
+        
+        <!-- RAM Metric Hero Banner -->
+        <div class="ram-hero-grid">
+          
+          <div class="glass-card ram-summary-box">
+            <div class="summary-top">
+              <div class="badge-accent">RAM MONITOR</div>
+              <span class="live-dot-cyan"></span>
+            </div>
+            <div class="ram-big-numbers">
+              <div class="ram-stat-main">
+                <span class="label">USED MEMORY</span>
+                <div class="value-row">
+                  <span class="val" id="ramUsedHero">--</span>
+                  <span class="unit">GB</span>
+                </div>
+                <span class="percent-sub" id="ramUsedPctHero">--% of total</span>
+              </div>
+              <div class="stat-divider"></div>
+              <div class="ram-stat-main">
+                <span class="label">AVAILABLE MEMORY</span>
+                <div class="value-row">
+                  <span class="val highlight-emerald" id="ramAvailHero">--</span>
+                  <span class="unit">GB</span>
+                </div>
+                <span class="percent-sub" id="ramAvailPctHero">--% available</span>
+              </div>
+            </div>
+
+            <!-- Memory Bar visualizer -->
+            <div class="memory-stacked-bar-container">
+              <div class="stacked-bar">
+                <div class="bar-segment bar-used" id="barUsed" style="width: 0%" title="Used"></div>
+                <div class="bar-segment bar-cached" id="barCached" style="width: 0%" title="Cached"></div>
+                <div class="bar-segment bar-buffers" id="barBuffers" style="width: 0%" title="Buffers"></div>
+                <div class="bar-segment bar-free" id="barFree" style="width: 0%" title="Free"></div>
+              </div>
+              <div class="stacked-legend">
+                <span class="legend-item"><span class="dot dot-used"></span> Used: <strong id="legendUsed">--</strong></span>
+                <span class="legend-item"><span class="dot dot-cached"></span> Cached: <strong id="legendCached">--</strong></span>
+                <span class="legend-item"><span class="dot dot-buffers"></span> Buffers: <strong id="legendBuffers">--</strong></span>
+                <span class="legend-item"><span class="dot dot-free"></span> Free: <strong id="legendFree">--</strong></span>
+              </div>
+            </div>
+
+            <!-- Quick Specs Row -->
+            <div class="ram-specs-row">
+              <div class="spec-tile">
+                <span class="spec-label">Total Installed</span>
+                <strong id="specTotalRam">-- GB</strong>
+              </div>
+              <div class="spec-tile">
+                <span class="spec-label">Shared RAM</span>
+                <strong id="specSharedRam">-- MB</strong>
+              </div>
+              <div class="spec-tile">
+                <span class="spec-label">Swap Used</span>
+                <strong id="specSwapUsed">--</strong>
+              </div>
+              <div class="spec-tile">
+                <span class="spec-label">Mem Pressure</span>
+                <strong id="specMemPressure">0.0%</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Doughnut Chart Distribution -->
+          <div class="glass-card ram-doughnut-card">
+            <h3>Memory Allocation Breakdown</h3>
+            <p class="card-subtitle">Real-time kernel memory mapping</p>
+            <div class="doughnut-wrapper">
+              <canvas id="ramDoughnutChart"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Real-Time Time Series Graph -->
+        <div class="glass-card chart-full-card">
+          <div class="chart-header">
+            <div>
+              <h3>Real-Time RAM Usage Timeline (Used vs Available)</h3>
+              <p class="card-subtitle">Streaming telemetry of memory consumption over time (updates every 1.5s)</p>
+            </div>
+            <div class="chart-legend-custom">
+              <span class="custom-legend-item"><span class="legend-color-cyan"></span> Used RAM (GB)</span>
+              <span class="custom-legend-item"><span class="legend-color-emerald"></span> Available RAM (GB)</span>
+            </div>
+          </div>
+          <div class="line-chart-container">
+            <canvas id="ramTimelineChart"></canvas>
+          </div>
+        </div>
+
+      </section>
+
+
+      <!-- ============================================================== -->
+      <!-- TAB 3: PROCESS MANAGER & CONTROLLER                            -->
+      <!-- ============================================================== -->
+      <section id="tab-processes" class="tab-content">
+        
+        <!-- Process Controller Toolbar -->
+        <div class="glass-card process-toolbar-card">
+          
+          <div class="toolbar-primary-row">
+            
+            <!-- Category Filter Pills -->
+            <div class="filter-pill-group">
+              <button class="pill-btn active" data-proc-cat="all">
+                All Processes
+                <span class="pill-badge" id="badgeAllProcs">0</span>
+              </button>
+              <button class="pill-btn" data-proc-cat="active">
+                <span class="live-dot-blue"></span>
+                Active Only
+                <span class="pill-badge badge-active" id="badgeActiveProcs">0</span>
+              </button>
+              <button class="pill-btn" data-proc-cat="background">
+                Background Only
+                <span class="pill-badge" id="badgeBgProcs">0</span>
+              </button>
+            </div>
+
+            <!-- User filter toggle -->
+            <div class="user-filter-group">
+              <button class="toggle-btn active" data-proc-user="all">All Users</button>
+              <button class="toggle-btn" data-proc-user="me" id="userMeToggleBtn">User (anto)</button>
+            </div>
+
+            <!-- Real-time Search Input -->
+            <div class="search-input-wrapper">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="procSearchInput" placeholder="Filter by name, PID, or command...">
+              <button id="btnClearSearch" class="btn-clear-search" style="display:none;">✕</button>
+            </div>
+
+          </div>
+
+          <!-- Secondary Action Bar: Crossing & Batch Actions -->
+          <div class="toolbar-secondary-row">
+            <div class="batch-cross-actions">
+              <span class="batch-title">Process Actions:</span>
+              <button id="btnCrossAllActive" class="btn btn-outline btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                <span>Cross All Active</span>
+              </button>
+              <button id="btnUncrossAll" class="btn btn-outline btn-sm">
+                <span>Uncross All</span>
+              </button>
+              <button id="btnKillCrossed" class="btn btn-warning btn-sm" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                <span id="btnKillCrossedText">Kill Crossed (0)</span>
+              </button>
+            </div>
+
+            <div class="emergency-kill-action">
+              <button id="btnKillAllActive" class="btn btn-danger btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                <span>Kill All Active Processes</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Crossed Process Tracker Banner -->
+          <div class="crossed-tracker-banner" id="crossedTrackerBanner" style="display: none;">
+            <div class="tracker-info">
+              <span class="tracker-icon">✕</span>
+              <span><strong><span id="crossedCountNumber">0</span> processes crossed</strong> for termination.</span>
+            </div>
+            <div class="tracker-actions">
+              <button id="btnExecuteCrossedKill" class="btn btn-danger btn-xs">Confirm Kill Crossed</button>
+              <button id="btnDismissCrossed" class="btn btn-secondary btn-xs">Clear</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Processes Table Card -->
+        <div class="glass-card table-card">
+          <div class="table-responsive">
+            <table class="process-table" id="processTable">
+              <thead>
+                <tr>
+                  <th style="width: 70px;">Cross</th>
+                  <th class="sortable" data-sort="pid" style="width: 85px;">PID <span class="sort-icon"></span></th>
+                  <th class="sortable" data-sort="name">Process Name <span class="sort-icon"></span></th>
+                  <th class="sortable" data-sort="category" style="width: 120px;">Category <span class="sort-icon"></span></th>
+                  <th class="sortable" data-sort="username" style="width: 90px;">User <span class="sort-icon"></span></th>
+                  <th class="sortable" data-sort="status" style="width: 100px;">Status <span class="sort-icon"></span></th>
+                  <th class="sortable" data-sort="cpu_percent" style="width: 120px;">CPU % <span class="sort-icon"></span></th>
+                  <th class="sortable" data-sort="memory_mb" style="width: 125px;">Memory <span class="sort-icon"></span></th>
+                  <th style="width: 140px; text-align: right;">Kill Action</th>
+                </tr>
+              </thead>
+              <tbody id="processTableBody">
+                <tr>
+                  <td colspan="9" class="loading-td">Loading Ubuntu process hierarchy...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-footer">
+            <span id="tableShowingCount">Showing 0 of 0 processes</span>
+            <div class="table-pagination" id="tablePagination">
+              <button id="btnPrevPage" class="btn-page" disabled>&larr; Prev</button>
+              <span id="pageIndicator">Page 1 / 1</span>
+              <button id="btnNextPage" class="btn-page" disabled>Next &rarr;</button>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- TAB 4: RUNNING PROGRAMS & SOFTWARE APPS                        -->
+      <!-- ============================================================== -->
+      <section id="tab-apps" class="tab-content">
+        
+        <!-- Summary Cards Grid -->
+        <div class="apps-summary-grid">
+          
+          <div class="glass-card app-stat-card">
+            <div class="app-stat-icon icon-app-count">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+              </svg>
+            </div>
+            <div class="app-stat-content">
+              <span class="app-stat-label">RUNNING PROGRAMS</span>
+              <div class="app-stat-val-row">
+                <span class="app-stat-number" id="appStatTotal">0</span>
+                <span class="app-stat-unit">Apps</span>
+              </div>
+              <span class="app-stat-sub" id="appStatSubCount">0 user apps · 0 daemons</span>
+            </div>
+          </div>
+
+          <div class="glass-card app-stat-card">
+            <div class="app-stat-icon icon-app-ram">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2"></rect>
+                <rect x="2" y="14" width="20" height="8" rx="2"></rect>
+                <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+              </svg>
+            </div>
+            <div class="app-stat-content">
+              <span class="app-stat-label">TOTAL PROGRAMS RAM</span>
+              <div class="app-stat-val-row">
+                <span class="app-stat-number highlight-cyan" id="appStatRam">0.0</span>
+                <span class="app-stat-unit">GB</span>
+              </div>
+              <span class="app-stat-sub" id="appStatRamSub">Combined resident memory</span>
+            </div>
+          </div>
+
+          <div class="glass-card app-stat-card">
+            <div class="app-stat-icon icon-app-heavy">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>
+              </svg>
+            </div>
+            <div class="app-stat-content">
+              <span class="app-stat-label">HEAVIEST PROGRAM</span>
+              <div class="app-stat-val-row">
+                <span class="app-stat-number-text highlight-rose" id="appStatHeaviestName">--</span>
+              </div>
+              <span class="app-stat-sub" id="appStatHeaviestUsage">-- MB (0% of RAM)</span>
+            </div>
+          </div>
+
+          <div class="glass-card app-stat-card">
+            <div class="app-stat-icon icon-app-procs">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+            </div>
+            <div class="app-stat-content">
+              <span class="app-stat-label">HIGHEST CPU LOAD</span>
+              <div class="app-stat-val-row">
+                <span class="app-stat-number-text highlight-amber" id="appStatTopCpuName">--</span>
+              </div>
+              <span class="app-stat-sub" id="appStatTopCpuUsage">0.0% CPU load</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Applications Toolbar Card -->
+        <div class="glass-card app-toolbar-card">
+          <div class="toolbar-primary-row">
+            <!-- Filter Pills -->
+            <div class="filter-pill-group">
+              <button class="pill-btn active" data-app-filter="all">
+                All Programs
+                <span class="pill-badge" id="badgeAllApps">0</span>
+              </button>
+              <button class="pill-btn" data-app-filter="user">
+                <span class="live-dot-blue"></span>
+                User Desktop Apps
+                <span class="pill-badge badge-active" id="badgeUserApps">0</span>
+              </button>
+              <button class="pill-btn" data-app-filter="heavy">
+                <span class="heavy-flame-dot">🔥</span>
+                Heavy Apps (&gt;400MB)
+                <span class="pill-badge badge-warning" id="badgeHeavyApps">0</span>
+              </button>
+              <button class="pill-btn" data-app-filter="daemons">
+                System Daemons
+                <span class="pill-badge" id="badgeDaemonApps">0</span>
+              </button>
+            </div>
+
+            <!-- Real-time App Search -->
+            <div class="search-input-wrapper">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="appSearchInput" placeholder="Search programs by name, package, or PID...">
+              <button id="btnClearAppSearch" class="btn-clear-search" style="display:none;">✕</button>
+            </div>
+          </div>
+
+          <div class="toolbar-secondary-row">
+            <div class="app-sort-options">
+              <span class="batch-title">Sort By:</span>
+              <button class="btn btn-outline btn-xs active" data-app-sort="memory">Memory (Highest)</button>
+              <button class="btn btn-outline btn-xs" data-app-sort="cpu">CPU %</button>
+              <button class="btn btn-outline btn-xs" data-app-sort="procs">Process Count</button>
+              <button class="btn btn-outline btn-xs" data-app-sort="name">Name (A-Z)</button>
+            </div>
+
+            <div class="app-view-toggles">
+              <button id="btnExpandAllApps" class="btn btn-outline btn-xs">
+                <span>Expand All Drawers</span>
+              </button>
+              <button id="btnCollapseAllApps" class="btn btn-outline btn-xs">
+                <span>Collapse All</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Applications List Container -->
+        <div class="apps-list-container" id="appsListContainer">
+          <div class="loading-state">
+            <span class="spinner-inline"></span>
+            <span>Inspecting running software packages and child process hierarchies...</span>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: Kill All Active Processes Safety Dialog                 -->
+  <!-- ============================================================== -->
+  <div class="modal-backdrop" id="killAllActiveModal">
+    <div class="modal-dialog">
+      <div class="modal-header modal-header-danger">
+        <div class="modal-icon-wrap">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div>
+          <h3>Kill All Active Processes?</h3>
+          <p class="modal-subtitle">Mass termination of active tasks</p>
+        </div>
+        <button class="btn-close-modal" id="btnCloseKillActiveModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-alert-box alert-warning">
+          <strong>Safety Shield Active:</strong> Protected system components (systemd, Xorg, lightdm, Python server PID <span id="modalServerPid">--</span>) will NOT be killed to prevent crashing your desktop session.
+        </div>
+        <p>This action will send termination signals to all active user applications:</p>
+        
+        <div class="active-targets-box" id="modalActiveTargetsList">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div class="modal-options-row">
+          <label>Signal Type:</label>
+          <div class="signal-selector">
+            <label><input type="radio" name="killActiveSignal" value="SIGTERM" checked> SIGTERM (Graceful exit)</label>
+            <label><input type="radio" name="killActiveSignal" value="SIGKILL"> SIGKILL (Force immediately)</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCancelKillActiveModal">Cancel</button>
+        <button class="btn btn-danger" id="btnConfirmKillAllActive">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <span>Terminate Active Processes</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: Kill Crossed Processes Confirmation                     -->
+  <!-- ============================================================== -->
+  <div class="modal-backdrop" id="killCrossedModal">
+    <div class="modal-dialog">
+      <div class="modal-header modal-header-warning">
+        <div class="modal-icon-wrap">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </div>
+        <div>
+          <h3>Kill Crossed Processes?</h3>
+          <p class="modal-subtitle">Batch termination of selected items</p>
+        </div>
+        <button class="btn-close-modal" id="btnCloseCrossedModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>You have crossed <strong id="modalCrossedCount">0</strong> processes. Are you sure you want to terminate them?</p>
+        <div class="crossed-targets-box" id="modalCrossedTargetsList"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCancelCrossedModal">Cancel</button>
+        <button class="btn btn-warning" id="btnConfirmKillCrossed">Kill Crossed Processes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: Kill Software Instance Confirmation                     -->
+  <!-- ============================================================== -->
+  <div class="modal-backdrop" id="killAppModal">
+    <div class="modal-dialog">
+      <div class="modal-header modal-header-danger">
+        <div class="modal-icon-wrap">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        </div>
+        <div>
+          <h3>End Entire Software Instance?</h3>
+          <p class="modal-subtitle">Terminate application and all associated child processes</p>
+        </div>
+        <button class="btn-close-modal" id="btnCloseKillAppModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>You are about to terminate the running software instance for <strong id="modalKillAppName">--</strong>.</p>
+        <div class="modal-alert-box alert-warning" id="modalKillAppAlert">
+          This will terminate all <strong id="modalKillAppProcCount">0</strong> processes associated with this software, freeing ~<span id="modalKillAppRam">--</span> of RAM.
+        </div>
+        <div class="modal-options-row">
+          <label>Termination Signal:</label>
+          <div class="signal-selector">
+            <label><input type="radio" name="killAppSignal" value="SIGTERM" checked> SIGTERM (Graceful exit)</label>
+            <label><input type="radio" name="killAppSignal" value="SIGKILL"> SIGKILL (Force immediately)</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCancelKillAppModal">Cancel</button>
+        <button class="btn btn-danger" id="btnConfirmKillApp">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <span>End Software Instance</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: Uninstall Software from System                          -->
+  <!-- ============================================================== -->
+  <div class="modal-backdrop" id="uninstallModal">
+    <div class="modal-dialog modal-dialog-lg">
+      <div class="modal-header modal-header-warning">
+        <div class="modal-icon-wrap">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        </div>
+        <div>
+          <h3>Uninstall Software from Ubuntu</h3>
+          <p class="modal-subtitle">Permanently remove package to free memory & disk space</p>
+        </div>
+        <button class="btn-close-modal" id="btnCloseUninstallModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Software Overview Card -->
+        <div class="uninstall-app-hero">
+          <div class="app-icon-lg" id="modalUninstallIcon">📦</div>
+          <div class="app-hero-info">
+            <h4 id="modalUninstallTitle">Software Name</h4>
+            <div class="app-hero-meta">
+              <span class="badge-mini badge-cyan" id="modalUninstallPkgManager">APT</span>
+              <span class="meta-item">Package: <code id="modalUninstallPkgName">package-name</code></span>
+              <span class="meta-item">Version: <strong id="modalUninstallVersion">--</strong></span>
+              <span class="meta-item">Size: <strong id="modalUninstallSize">--</strong></span>
+            </div>
+            <p class="app-hero-desc" id="modalUninstallDesc">Package description...</p>
+          </div>
+        </div>
+
+        <div class="modal-alert-box alert-warning">
+          <strong>Process Alert:</strong> <span id="modalUninstallProcAlert">Active processes will be terminated before removal.</span>
+        </div>
+
+        <div class="uninstall-options-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="chkUninstallKillFirst" checked>
+            <span>Terminate all running processes of this software before uninstallation</span>
+          </label>
+        </div>
+
+        <!-- Terminal Command Quick Copy -->
+        <div class="terminal-cmd-box">
+          <div class="cmd-box-header">
+            <span>Ubuntu Terminal Command:</span>
+            <button class="btn-copy-cmd" id="btnCopyUninstallCmd">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span id="copyCmdText">Copy Command</span>
+            </button>
+          </div>
+          <code class="cmd-snippet" id="modalUninstallCmdSnippet">sudo apt remove --purge -y package-name</code>
+        </div>
+
+        <!-- Sudo Auth and Execution Controls -->
+        <div class="sudo-auth-row">
+          <div class="password-field-wrap">
+            <label for="sudoPasswordInput">Sudo Password:</label>
+            <div class="input-with-icon">
+              <input type="password" id="sudoPasswordInput" value="anto" placeholder="Enter sudo password...">
+              <button type="button" class="btn-toggle-pwd" id="btnTogglePwd" title="Show/Hide password">👁</button>
+            </div>
+          </div>
+          <div class="auth-buttons-wrap">
+            <button class="btn btn-secondary btn-sm" id="btnSimulateUninstall" title="Simulate removal without modifying system">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>Simulate Removal</span>
+            </button>
+            <button class="btn btn-danger btn-sm" id="btnExecuteUninstall">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              <span>Confirm & Uninstall</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Terminal Log Output Console -->
+        <div class="uninstall-console-wrap" id="uninstallConsoleWrap" style="display: none;">
+          <div class="console-header">
+            <span class="console-title">Uninstaller Terminal Output</span>
+            <span class="console-status" id="uninstallConsoleStatus">Running...</span>
+          </div>
+          <pre class="console-output" id="uninstallConsoleOutput"></pre>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCloseUninstallDialog">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notifications Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Vendor Script: Local Chart.js -->
+  <script src="js/chart.min.js"></script>
+  <!-- Main Frontend Application Logic -->
+  <script src="js/app.js"></script>
+</body>
+</html>

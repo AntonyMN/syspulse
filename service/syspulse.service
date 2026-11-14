@@ -1,0 +1,15 @@
+[Unit]
+Description=SysPulse - System Health Doctor, RAM Telemetry & Process Controller
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env python3 %h/builds/ram/server.py
+WorkingDirectory=%h/builds/ram
+Restart=on-failure
+RestartSec=5s
+Environment="PORT=5050"
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=default.target

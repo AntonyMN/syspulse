@@ -25,6 +25,13 @@ except ImportError:
     print("ERROR: psutil is required. Please install it using: sudo apt install python3-psutil or pip install psutil")
     sys.exit(1)
 
+# Platform / OS Detection
+OS_TYPE = platform.system()
+IS_LINUX = OS_TYPE == "Linux"
+IS_WINDOWS = OS_TYPE == "Windows"
+IS_MACOS = OS_TYPE == "Darwin"
+SIGKILL_VAL = getattr(signal, 'SIGKILL', signal.SIGTERM)
+
 # Global configuration
 PORT = int(os.environ.get("PORT", 5050))
 HOST = "0.0.0.0"
@@ -32,13 +39,22 @@ CURRENT_USER = getpass.getuser()
 SERVER_PID = os.getpid()
 
 # Protected process names that should NEVER be killed en masse
-PROTECTED_NAMES = {
-    'systemd', 'init', 'kthreadd', 'systemd-journald', 'systemd-udevd',
-    'systemd-logind', 'systemd-resolved', 'dbus-daemon', 'lightdm', 'Xorg',
-    'Xwayland', 'gnome-shell', 'budgie-wm', 'pipewire', 'wireplumber',
-    'polkitd', 'sshd', 'login', 'agetty', 'antigravity-ide', 'code',
-    'bash', 'zsh', 'sh', 'python3', 'python'
-}
+if IS_WINDOWS:
+    PROTECTED_NAMES = {
+        'system', 'registry', 'smss.exe', 'csrss.exe', 'wininit.exe',
+        'services.exe', 'lsass.exe', 'svchost.exe', 'fontdrvhost.exe',
+        'dwm.exe', 'explorer.exe', 'sihost.exe', 'taskhostw.exe',
+        'runtimebroker.exe', 'python.exe', 'pythonw.exe', 'cmd.exe',
+        'powershell.exe', 'conhost.exe', 'code.exe'
+    }
+else:
+    PROTECTED_NAMES = {
+        'systemd', 'init', 'kthreadd', 'systemd-journald', 'systemd-udevd',
+        'systemd-logind', 'systemd-resolved', 'dbus-daemon', 'lightdm', 'Xorg',
+        'Xwayland', 'gnome-shell', 'budgie-wm', 'pipewire', 'wireplumber',
+        'polkitd', 'sshd', 'login', 'agetty', 'antigravity-ide', 'code',
+        'bash', 'zsh', 'sh', 'python3', 'python'
+    }
 
 # Protected package names that should NEVER be uninstalled
 PROTECTED_PACKAGES = {
@@ -151,6 +167,21 @@ def get_battery_health():
                     bat_info['assessment'] = 'Excellent'
             break
 
+    if IS_WINDOWS and bat_info['present'] and bat_info['health_percent'] is None:
+        try:
+            cmd = ['powershell', '-NoProfile', '-Command',
+                   'Get-CimInstance -ClassName BatteryStaticData -Namespace root/wmi -ErrorAction SilentlyContinue | Select-Object -ExpandProperty DesignedCapacity; Get-CimInstance -ClassName BatteryFullChargedCapacity -Namespace root/wmi -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullChargedCapacity']
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+            nums = [int(s) for s in res.stdout.split() if s.isdigit()]
+            if len(nums) >= 2 and nums[0] > 0:
+                design, full = nums[0], nums[1]
+                health = (full / design) * 100.0
+                bat_info['health_percent'] = round(min(100.0, health), 1)
+                bat_info['wear_percent'] = round(max(0.0, 100.0 - health), 1)
+                bat_info['assessment'] = 'Good' if health >= 80 else 'Degraded'
+        except Exception:
+            pass
+
     return bat_info
 
 
@@ -189,6 +220,22 @@ def get_thermal_health():
             thermals['sensors'][name] = formatted_entries
     except Exception as e:
         thermals['error'] = str(e)
+
+    if IS_WINDOWS and not thermals['sensors']:
+        try:
+            cmd = ['powershell', '-NoProfile', '-Command',
+                   'Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CurrentTemperature']
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+            for line in res.stdout.split():
+                if line.isdigit():
+                    celsius = round((int(line) / 10.0) - 273.15, 1)
+                    if 10 < celsius < 120:
+                        thermals['max_temp'] = celsius
+                        thermals['package_temp'] = celsius
+                        thermals['sensors']['ACPI'] = [{'label': 'Thermal Zone', 'current': celsius, 'high': 85.0, 'critical': 95.0}]
+                        break
+        except Exception:
+            pass
 
     if thermals['package_temp'] is None and thermals['max_temp'] > 0:
         thermals['package_temp'] = thermals['max_temp']
@@ -229,12 +276,14 @@ def get_disk_health():
                 }
                 disks.append(disk_entry)
 
-                if p.mountpoint == '/' and used_pct >= 90.0:
+                is_system_drive = (p.mountpoint.lower() == 'c:\\' or p.mountpoint.lower() == 'c:') if IS_WINDOWS else (p.mountpoint == '/')
+                if is_system_drive and used_pct >= 90.0:
+                    os_rec = 'Run Disk Cleanup (`cleanmgr.exe`) or clear temporary files in %TEMP%.' if IS_WINDOWS else 'Run `sudo apt clean`, purge old kernels, clear ~/.cache, or remove unused large files.'
                     issues.append({
                         'severity': 'critical' if used_pct >= 95.0 else 'warning',
-                        'title': f'Low Root Storage: {used_pct}% Used ({disk_entry["free_str"]} free)',
-                        'description': f'Filesystem {p.device} mounted on / is nearly full. Ubuntu performance and package installations will fail.',
-                        'recommendation': 'Run `sudo apt clean`, purge old kernels, clear ~/.cache, or remove unused large files.'
+                        'title': f'Low System Storage: {used_pct}% Used ({disk_entry["free_str"]} free)',
+                        'description': f'Filesystem {p.device} mounted on {p.mountpoint} is nearly full.',
+                        'recommendation': os_rec
                     })
             except (PermissionError, FileNotFoundError):
                 pass
@@ -245,8 +294,57 @@ def get_disk_health():
 
 
 def get_system_errors():
-    """Collect system errors from journalctl and failed systemd units."""
+    """Collect system errors from journalctl and failed systemd units (Linux) or Event Log and Services (Windows)."""
     errors = []
+
+    if IS_WINDOWS:
+        # 1. Check failed / stopped automatic Windows Services
+        try:
+            cmd = ['powershell', '-NoProfile', '-Command',
+                   "Get-Service | Where-Object {$_.StartType -eq 'Automatic' -and $_.Status -ne 'Running'} | Select-Object -Property Name, DisplayName | ConvertTo-Json -Compress"]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+            if res.returncode == 0 and res.stdout.strip():
+                try:
+                    svc_data = json.loads(res.stdout.strip())
+                    if isinstance(svc_data, dict):
+                        svc_data = [svc_data]
+                    for s in svc_data[:5]:
+                        errors.append({
+                            'severity': 'warning',
+                            'category': 'Windows Service',
+                            'title': f"Stopped Service: {s.get('DisplayName', s.get('Name'))}",
+                            'description': f"Automatic service {s.get('Name')} is currently not running.",
+                            'recommendation': f"Start the service in services.msc or with `Start-Service {s.get('Name')}`."
+                        })
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # 2. Check Windows Event Log (System log errors)
+        try:
+            cmd = ['powershell', '-NoProfile', '-Command',
+                   "Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2} -MaxEvents 5 -ErrorAction SilentlyContinue | Select-Object -Property ProviderName, Message | ConvertTo-Json -Compress"]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+            if res.returncode == 0 and res.stdout.strip():
+                try:
+                    ev_data = json.loads(res.stdout.strip())
+                    if isinstance(ev_data, dict):
+                        ev_data = [ev_data]
+                    for ev in ev_data[:5]:
+                        msg = (ev.get('Message') or 'System error event').splitlines()[0][:120]
+                        errors.append({
+                            'severity': 'warning',
+                            'category': 'Event Log',
+                            'title': f"Event: {ev.get('ProviderName', 'System')}",
+                            'description': msg,
+                            'recommendation': 'Inspect Windows Event Viewer (eventvwr.msc) under System log for details.'
+                        })
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return errors
 
     # 1. Check failed systemd units
     try:
@@ -393,16 +491,28 @@ def get_system_condition():
     all_issues = disk_data['issues'] + errors
     health_score = compute_health_score(battery, thermals, disk_data, all_issues)
 
-    # Load average
-    load_1, load_5, load_15 = os.getloadavg()
+    # Load average (fallback for Windows where os.getloadavg is unavailable)
     cpu_count = psutil.cpu_count(logical=True) or 1
+    if hasattr(os, 'getloadavg'):
+        load_1, load_5, load_15 = os.getloadavg()
+    else:
+        cpu_p = psutil.cpu_percent(interval=None)
+        load_1, load_5, load_15 = round((cpu_p / 100.0) * cpu_count, 2), 0.0, 0.0
+
+    if IS_WINDOWS:
+        os_display = f"Windows {platform.release()}"
+    elif IS_LINUX:
+        os_display = "Ubuntu Linux" if "ubuntu" in platform.platform().lower() else f"Linux ({platform.system()})"
+    else:
+        os_display = platform.system()
 
     return {
         'timestamp': time.time(),
         'system': {
             'hostname': socket.gethostname(),
             'platform': platform.platform(),
-            'os_name': 'Ubuntu Linux',
+            'os_name': os_display,
+            'os_type': OS_TYPE,
             'uptime_seconds': int(time.time() - psutil.boot_time()),
             'cpu_count': cpu_count,
             'load_avg': [round(load_1, 2), round(load_5, 2), round(load_15, 2)],
@@ -489,6 +599,7 @@ def is_active_process(info, current_user):
     cpu = info.get('cpu_percent', 0.0) or 0.0
     terminal = info.get('terminal')
     name = (info.get('name') or '').lower()
+    clean_name = name[:-4] if name.endswith('.exe') else name
     username = info.get('username') or ''
     cmdline = ' '.join(info.get('cmdline') or []).lower()
 
@@ -504,15 +615,16 @@ def is_active_process(info, current_user):
 
     # Interactive desktop apps belonging to user
     user_interactive_names = {
-        'chrome', 'firefox', 'brave', 'opera', 'chromium',
+        'chrome', 'firefox', 'brave', 'opera', 'chromium', 'msedge',
         'antigravity-ide', 'code', 'vlc', 'mpv', 'spotify',
         'discord', 'slack', 'telegram-desktop', 'steam',
         'terminal', 'gnome-terminal', 'tilix', 'alacritty', 'kitty',
-        'bash', 'zsh', 'fish', 'node', 'python3', 'python', 'git'
+        'bash', 'zsh', 'fish', 'node', 'python3', 'python', 'pythonw', 'git',
+        'explorer', 'notepad', 'cmd', 'powershell', 'windowsterminal', 'teams'
     }
 
-    if username == current_user:
-        if name in user_interactive_names:
+    if username == current_user or IS_WINDOWS:
+        if clean_name in user_interactive_names or name in user_interactive_names:
             return True, "User Interactive App"
         # Check if cmdline points to interactive app
         for keyword in user_interactive_names:
@@ -554,12 +666,21 @@ def sample_processes():
 
             # Safe to kill check
             name = (info.get('name') or '').lower()
+            clean_name = name[:-4] if name.endswith('.exe') else name
             pid = info['pid']
-            is_protected = (
-                pid in (1, 2, SERVER_PID) or
-                name in PROTECTED_NAMES or
-                info.get('username') == 'root' and pid < 1000
-            )
+            if IS_WINDOWS:
+                is_protected = (
+                    pid in (0, 4, SERVER_PID) or
+                    name in PROTECTED_NAMES or
+                    clean_name in PROTECTED_NAMES
+                )
+            else:
+                is_protected = (
+                    pid in (1, 2, SERVER_PID) or
+                    name in PROTECTED_NAMES or
+                    clean_name in PROTECTED_NAMES or
+                    (info.get('username') == 'root' and pid < 1000)
+                )
             info['is_protected'] = is_protected
 
             # Clean cmdline preview
@@ -575,12 +696,35 @@ def sample_processes():
 
 
 def scan_desktop_entries():
-    """Scan system .desktop files to map application names, icons, and executables."""
+    """Scan system .desktop files (Linux) or Start Menu shortcuts (Windows) to map application names, icons, and executables."""
     global DESKTOP_APPS_CACHE, LAST_DESKTOP_SCAN
     if time.time() - LAST_DESKTOP_SCAN < 60 and DESKTOP_APPS_CACHE:
         return DESKTOP_APPS_CACHE
 
     desktop_map = {}
+
+    if IS_WINDOWS:
+        dirs = [
+            os.path.expandvars(r'%ProgramData%\Microsoft\Windows\Start Menu\Programs'),
+            os.path.expandvars(r'%AppData%\Microsoft\Windows\Start Menu\Programs')
+        ]
+        for d in dirs:
+            if not os.path.isdir(d):
+                continue
+            for root, _, files in os.walk(d):
+                for f in files:
+                    if f.lower().endswith('.lnk'):
+                        base = os.path.splitext(f)[0].lower()
+                        desktop_map[base] = {
+                            'name': os.path.splitext(f)[0],
+                            'icon': 'application',
+                            'comment': 'Windows Application',
+                            'desktop_file': os.path.join(root, f)
+                        }
+        DESKTOP_APPS_CACHE = desktop_map
+        LAST_DESKTOP_SCAN = time.time()
+        return desktop_map
+
     dirs = [
         '/usr/share/applications',
         '/var/lib/snapd/desktop/applications',
@@ -628,6 +772,20 @@ def resolve_package_info(exe_path, app_name):
     with PACKAGE_CACHE_LOCK:
         if exe_path in PACKAGE_CACHE:
             return PACKAGE_CACHE[exe_path]
+
+    if IS_WINDOWS:
+        pkg_name = app_name.lower()
+        is_prot = pkg_name in ('explorer', 'system', 'dwm', 'csrss', 'python', 'pythonw')
+        pkg_info = {
+            'manager': 'winget' if not is_prot else 'system',
+            'package': app_name,
+            'can_uninstall': not is_prot,
+            'is_protected': is_prot,
+            'reason': 'Windows Core System' if is_prot else None
+        }
+        with PACKAGE_CACHE_LOCK:
+            PACKAGE_CACHE[exe_path] = pkg_info
+        return pkg_info
 
     pkg_info = {'manager': 'system', 'package': app_name.lower(), 'can_uninstall': False, 'is_protected': False}
 
@@ -1133,6 +1291,14 @@ class SysPulseHandler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
+        # Route web endpoints: default / to dashboard.html, /docs to index.html (landing)
+        if path in ('/', '/index.html', '/dashboard', '/dashboard.html'):
+            self.path = '/dashboard.html'
+            return super().do_GET()
+        elif path in ('/docs', '/docs/'):
+            self.path = '/index.html'
+            return super().do_GET()
+
         if path == '/api/system/condition':
             data = get_system_condition()
             self._send_json(data)
@@ -1231,13 +1397,13 @@ class SysPulseHandler(SimpleHTTPRequestHandler):
         if path == '/api/processes/kill':
             pid = body.get('pid')
             sig_name = body.get('signal', 'SIGTERM').upper()
-            sig = signal.SIGKILL if sig_name == 'SIGKILL' else signal.SIGTERM
+            sig = SIGKILL_VAL if sig_name == 'SIGKILL' else signal.SIGTERM
 
             if not pid or not isinstance(pid, int):
                 self._send_json({'success': False, 'error': 'Invalid PID'}, status=400)
                 return
 
-            if pid in (1, 2, SERVER_PID):
+            if pid in (0, 1, 2, 4, SERVER_PID):
                 self._send_json({'success': False, 'error': f'Cannot kill protected system process {pid}'}, status=403)
                 return
 
@@ -1262,7 +1428,7 @@ class SysPulseHandler(SimpleHTTPRequestHandler):
         elif path == '/api/processes/kill-batch':
             pids = body.get('pids', [])
             sig_name = body.get('signal', 'SIGTERM').upper()
-            sig = signal.SIGKILL if sig_name == 'SIGKILL' else signal.SIGTERM
+            sig = SIGKILL_VAL if sig_name == 'SIGKILL' else signal.SIGTERM
 
             if not isinstance(pids, list) or not pids:
                 self._send_json({'success': False, 'error': 'No PIDs provided'}, status=400)
@@ -1272,7 +1438,7 @@ class SysPulseHandler(SimpleHTTPRequestHandler):
             failed = []
 
             for pid in pids:
-                if pid in (1, 2, SERVER_PID):
+                if pid in (0, 1, 2, 4, SERVER_PID):
                     failed.append({'pid': pid, 'reason': 'Protected process'})
                     continue
                 try:
@@ -1298,7 +1464,7 @@ class SysPulseHandler(SimpleHTTPRequestHandler):
         elif path == '/api/processes/kill-all-active':
             # Terminate all active non-protected processes
             sig_name = body.get('signal', 'SIGTERM').upper()
-            sig = signal.SIGKILL if sig_name == 'SIGKILL' else signal.SIGTERM
+            sig = SIGKILL_VAL if sig_name == 'SIGKILL' else signal.SIGTERM
             include_other_users = body.get('include_other_users', False)
 
             with PROCESS_CACHE_LOCK:
@@ -1369,7 +1535,7 @@ class SysPulseHandler(SimpleHTTPRequestHandler):
             killed = []
             failed = []
             for pid in target_pids:
-                if pid in (1, 2, SERVER_PID):
+                if pid in (0, 1, 2, 4, SERVER_PID):
                     failed.append({'pid': pid, 'reason': 'Protected system process'})
                     continue
                 try:
@@ -1509,6 +1675,30 @@ class SysPulseHandler(SimpleHTTPRequestHandler):
         self._send_json({'error': 'Not found'}, status=404)
 
 
+def record_runtime_info(port, pid):
+    """Save runtime port and PID for service monitoring and conflict tools."""
+    try:
+        run_dir = os.path.expanduser('~/.syspulse')
+        os.makedirs(run_dir, exist_ok=True)
+        with open(os.path.join(run_dir, 'syspulse.pid'), 'w') as f:
+            f.write(str(pid))
+        with open(os.path.join(run_dir, 'syspulse.port'), 'w') as f:
+            f.write(str(port))
+    except Exception:
+        pass
+
+
+def cleanup_runtime_info():
+    """Clean up runtime files on exit."""
+    try:
+        run_dir = os.path.expanduser('~/.syspulse')
+        pid_file = os.path.join(run_dir, 'syspulse.pid')
+        if os.path.exists(pid_file):
+            os.remove(pid_file)
+    except Exception:
+        pass
+
+
 def find_available_port(start_port=5050, max_tries=20):
     """Find a free TCP port."""
     for p in range(start_port, start_port + max_tries):
@@ -1524,6 +1714,7 @@ def find_available_port(start_port=5050, max_tries=20):
 def main():
     global PORT
     PORT = find_available_port(PORT)
+    record_runtime_info(PORT, SERVER_PID)
 
     # Launch background monitor thread
     t = threading.Thread(target=background_monitor_thread, daemon=True)
@@ -1536,16 +1727,19 @@ def main():
     httpd = ThreadingHTTPServer(server_address, SysPulseHandler)
     url = f"http://127.0.0.1:{PORT}"
     print(f"===========================================================")
-    print(f"  SysPulse: Ubuntu Laptop Doctor, RAM & Process Monitor    ")
+    print(f"  SysPulse: Cross-Platform System Doctor & Process Manager  ")
+    print(f"  Operating System: {OS_TYPE} ({platform.system()} {platform.release()})")
     print(f"===========================================================")
-    print(f"  Web Dashboard running at: {url}")
-    print(f"  Active User: {CURRENT_USER} | PID: {SERVER_PID}")
+    print(f"  Live Dashboard:   {url}/")
+    print(f"  Documentation:    {url}/docs")
+    print(f"  Active User:      {CURRENT_USER} | PID: {SERVER_PID}")
     print(f"===========================================================")
 
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("\nShutting down server gracefully...")
+        cleanup_runtime_info()
         httpd.server_close()
 
 
