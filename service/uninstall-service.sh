@@ -29,3 +29,4 @@ fi
 systemctl --user daemon-reload
 echo "✓ SysPulse background service has been completely removed."
 echo "=========================================================="
+

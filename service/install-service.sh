@@ -66,3 +66,4 @@ echo "  Restart:       systemctl --user restart $SERVICE_NAME"
 echo "  View logs:     journalctl --user -u $SERVICE_NAME -f"
 echo "  Web Dashboard: http://127.0.0.1:$PORT"
 echo "=========================================================="
+

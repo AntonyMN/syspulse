@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # SysPulse Windows Service Installer (PowerShell)
 # Registers a silent Windows background service running on logon via Task Scheduler.
 # ==============================================================================
@@ -45,3 +45,4 @@ Write-Host "✓ SysPulse service registered and running in background!" -Foregro
 Write-Host "  Dashboard URL:  http://127.0.0.1:5050" -ForegroundColor White
 Write-Host "  Task Name:      $taskName" -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Green
+
